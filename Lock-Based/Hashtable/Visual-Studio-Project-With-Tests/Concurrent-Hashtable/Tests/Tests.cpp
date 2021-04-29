@@ -143,5 +143,23 @@ namespace Tests
 				}
 			}
 		}
+
+		TEST_METHOD(GetUnorderedMapMethodTest)
+		{
+			size_t numIterations = 10;
+			std::unordered_map<int, int> unorderedMap;
+			
+			// Launch all threads that will insert into the table.
+			for (size_t i = 0; i < numIterations; ++i)
+			{
+				unorderedMap.emplace(i, i);
+				g_threads.push_back(std::move(std::thread(InsertKeyValuePair, std::ref(g_concurrentHashtable), i, i)));
+			}
+
+			// Wait for all inserting threads to finish.
+			std::for_each(g_threads.begin(), g_threads.end(), [&](std::thread& thread) -> void { thread.join(); });
+
+			Assert::IsTrue(unorderedMap == g_concurrentHashtable.GetUnorderedMap());
+		}
 	};
 }

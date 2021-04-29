@@ -4,6 +4,7 @@
 #include <mutex>
 #include <shared_mutex>
 #include <memory>
+#include <unordered_map>
 
 template <typename TKey, typename TValue, typename THashFunction=std::hash<TKey>>
 class ConcurrentHashtable
@@ -36,6 +37,9 @@ public:
 
 	// Clear the contents of each bucket.
 	void Clear();
+
+	// Get a snap-shot of the current state of the Hashtable.
+	std::unordered_map<TKey, TValue, THashFunction> GetUnorderedMap() const;
 
 private:
 	// Internal type aliases.
@@ -141,6 +145,31 @@ inline void ConcurrentHashtable<TKey, TValue, THashFunction>::Clear()
 		std::unique_lock<std::shared_mutex> lock(bucket->sharedMutex);
 		bucket->keyValueList.clear();
 	}
+}
+
+template<typename TKey, typename TValue, typename THashFunction>
+inline std::unordered_map<TKey, TValue, THashFunction> ConcurrentHashtable<TKey, TValue, THashFunction>::GetUnorderedMap() const
+{
+	std::vector<std::unique_lock<std::shared_mutex>> locks;
+
+	// Acquire a lock for each bucket to ensure safe map construction.
+	for (size_t i = 0; i < m_buckets.size(); ++i)
+	{
+		std::unique_lock<std::shared_mutex> lock(m_buckets[i]->sharedMutex);
+		locks.push_back(std::move(lock));
+	}
+
+	std::unordered_map<TKey, TValue, THashFunction> snapShotMap;
+
+	for (const std::unique_ptr<Bucket>& bucketPtr : m_buckets)
+	{
+		for (const std::pair<TKey, TValue>& pair : bucketPtr->keyValueList)
+		{
+			snapShotMap.emplace(pair.first, pair.second);
+		}
+	}
+
+	return snapShotMap;
 }
 
 template<typename TKey, typename TValue, typename THashFunction>
