@@ -20,7 +20,7 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
-    <ProjectGuid>{3858A505-5716-4034-B93D-F32BD4412F8D}</ProjectGuid>
+    <ProjectGuid>{2BBF3402-CFDF-418D-9187-764F9BB3B78D}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>Tests</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
@@ -169,7 +169,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Concurrent-List\Concurrent-List.vcxproj">
-      <Project>{ed280d1f-8781-49c8-8518-df403466d960}</Project>
+      <Project>{c4e2c30e-d553-4121-96c9-de44b8da3be6}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

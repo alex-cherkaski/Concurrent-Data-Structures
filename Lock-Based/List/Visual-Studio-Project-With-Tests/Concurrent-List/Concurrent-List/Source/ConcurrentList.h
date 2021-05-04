@@ -1,7 +1,6 @@
 #pragma once
 #include <mutex>
 #include <memory>
-#include <functional>
 
 template<typename T>
 class ConcurrentList
@@ -32,7 +31,6 @@ public:
 	template<typename TFunction> void RemoveIf(TFunction predicate);
 
 private:
-
 	// The list consists of one or more of these nodes.
 	struct Node
 	{
@@ -40,7 +38,7 @@ private:
 		std::shared_ptr<T> data;
 		Node* next;
 
-		Node() : data(std::shared_ptr<T>()), next(nullptr) {}
+		Node() : data(nullptr), next(nullptr) {}
 		Node(const T& data) : data(std::make_shared<T>(data)), next(nullptr) {}
 	};
 
@@ -48,19 +46,25 @@ private:
 };
 
 template<typename T>
-inline ConcurrentList<T>::ConcurrentList() : m_head(new Node)
+inline ConcurrentList<T>::ConcurrentList() : m_head(new Node) // Each list has single dummy node.
 {
 }
 
 template<typename T>
 inline ConcurrentList<T>::~ConcurrentList()
 {
-	while (m_head != nullptr)
+	std::unique_lock<std::mutex> lock(m_head->mutex);
+	Node* currentNode = m_head;
+
+	while (currentNode->next != nullptr)
 	{
-		Node* previousNode = m_head;
-		m_head = m_head->next;
-		delete previousNode;
+		Node* nodeToDelete = currentNode;
+		currentNode = currentNode->next;
+		lock = std::move(std::unique_lock<std::mutex>(currentNode->mutex));
 	}
+
+	lock.unlock();
+	delete currentNode; // All but the last node were deleted above.
 }
 
 template<typename T>
@@ -68,24 +72,22 @@ inline void ConcurrentList<T>::PushToFront(const T& data)
 {
 	Node* newNode = new Node(data);
 	std::lock_guard<std::mutex> lock(m_head->mutex);
-	newNode->next = m_head;
-	m_head = newNode;
+	newNode->next = m_head->next;
+	m_head->next = newNode;
 }
 
 template<typename T>
 template<typename TFunction>
 inline void ConcurrentList<T>::ForEach(TFunction function)
 {
-	std::unique_lock<std::mutex> firstLock(m_head->mutex);
-	Node* currentNode = m_head;
+	std::unique_lock<std::mutex> lock(m_head->mutex);
+	Node* currentNode = m_head->next; // The head node is a dummy enpty node.
 
-	// The empty shared pointer is the dummy node.
-	while (currentNode->data != nullptr)
+	while (currentNode != nullptr)
 	{
+		lock = std::move(std::unique_lock<std::mutex>(currentNode->mutex));
 		function(*(currentNode->data));
-		std::unique_lock<std::mutex> secondLock(currentNode->next->mutex);
 		currentNode = currentNode->next;
-		firstLock = std::move(secondLock);
 	}
 }
 
@@ -93,22 +95,20 @@ template<typename T>
 template<typename TFunction>
 inline std::shared_ptr<T> ConcurrentList<T>::FindFirstIf(TFunction predicate)
 {
-	std::unique_lock<std::mutex> firstLock(m_head->mutex);
-	Node* currentNode = m_head;
+	std::unique_lock<std::mutex> lock(m_head->mutex);
+	Node* currentNode = m_head->next;
 
-	// The empty shared pointer is the dummy node.
-	while (currentNode->data != nullptr)
+	while (currentNode != nullptr)
 	{
+		lock  = std::move(std::unique_lock<std::mutex>(currentNode->mutex));
+
 		if (predicate(*(currentNode->data)))
 		{
 			return currentNode->data;
 		}
 
-		std::unique_lock<std::mutex> secondLock(currentNode->next->mutex);
 		currentNode = currentNode->next;
-		firstLock = std::move(secondLock);
 	}
-
 	return std::shared_ptr<T>(nullptr);
 }
 
@@ -117,54 +117,27 @@ template<typename TFunction>
 inline void ConcurrentList<T>::RemoveIf(TFunction predicate)
 {
 	std::unique_lock<std::mutex> firstLock(m_head->mutex);
-	Node* currentNode = m_head;
-	Node* previouseNode = nullptr;
+	Node* previouseNode = m_head;
+	Node* currentNode = m_head->next;
 
-	// The empty shared pointer is the dummy node.
-	while (currentNode->data != nullptr)
+	while (currentNode != nullptr)
 	{
+		std::unique_lock<std::mutex> secondLock(currentNode->mutex);
+
 		if (predicate(*(currentNode->data)))
 		{
-			// The head node satisfies the predicate.
-			if (previouseNode == nullptr)
-			{
-				std::unique_lock<std::mutex> secondLock(currentNode->next->mutex);
-				Node* nodeToDelete = currentNode;
-				currentNode = currentNode->next;
-				m_head = currentNode;
-				
-				// Unlock the mutex before deleting the node.
-				firstLock.unlock();
-				firstLock.release();
-				delete nodeToDelete;
-				firstLock = std::move(secondLock);
-			}
-
-			else
-			{
-				std::lock(previouseNode->mutex, currentNode->next->mutex);
-				std::unique_lock<std::mutex> secondLock(previouseNode->mutex, std::adopt_lock);
-				std::unique_lock<std::mutex> thirdLock(currentNode->next->mutex, std::adopt_lock);
-
-				Node* nodeToDelete = currentNode;
-				currentNode = currentNode->next;
-				previouseNode->next = currentNode;
-
-				// Unlock the mutex before deleting the node.
-				firstLock.unlock();
-				firstLock.release();
-				delete nodeToDelete;
-				firstLock = std::move(thirdLock);
-			}
+			previouseNode->next = currentNode->next;
+			Node* nodeToDelete = currentNode;
+			currentNode = currentNode->next;
+			secondLock.unlock();
+			delete nodeToDelete;
 		}
 
 		else
 		{
 			previouseNode = currentNode;
-			std::unique_lock<std::mutex> secondLock(currentNode->next->mutex);
 			currentNode = currentNode->next;
 			firstLock = std::move(secondLock);
 		}
 	}
 }
-
