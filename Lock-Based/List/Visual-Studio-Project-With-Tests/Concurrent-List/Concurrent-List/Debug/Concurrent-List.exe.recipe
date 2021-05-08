@@ -2,7 +2,7 @@
 <Project>
   <ProjectOutputs>
     <ProjectOutput>
-      <FullPath>C:\Development-Created\Repositories\Concurrent-List\Debug\Concurrent-List.exe</FullPath>
+      <FullPath>C:\Development-Created\Repositories\Concurrent-Data-Structures\Lock-Based\List\Visual-Studio-Project-With-Tests\Concurrent-List\Debug\Concurrent-List.exe</FullPath>
     </ProjectOutput>
   </ProjectOutputs>
   <ContentFiles />
