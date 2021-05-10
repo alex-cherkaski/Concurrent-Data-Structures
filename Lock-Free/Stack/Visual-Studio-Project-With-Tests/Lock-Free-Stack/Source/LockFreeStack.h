@@ -62,7 +62,7 @@ inline void LockFreeStack<T>::Push(const T& data)
 template<typename T>
 inline std::shared_ptr<T> LockFreeStack<T>::Pop()
 {
-	// Move the head node to poin to the next node on the stack.
+	// Move the head node to point to the next node on the stack.
 	Node* nodeToPop = m_head.load();
 	while (nodeToPop != nullptr && !m_head.compare_exchange_weak(nodeToPop, nodeToPop->next));
 
@@ -70,7 +70,7 @@ inline std::shared_ptr<T> LockFreeStack<T>::Pop()
 	if (nodeToPop != nullptr)
 	{
 		dataPtr.swap(nodeToPop->data);
-		delete nodeToPop;
+		delete nodeToPop; // At this point no other thread is referencing this node so safe to delete.
 	}
 
 	return (dataPtr == nullptr) ? std::shared_ptr<T>() : dataPtr;
